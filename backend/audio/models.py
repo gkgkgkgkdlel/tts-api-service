@@ -10,7 +10,6 @@ class Audio(models.Model):
     audio_file = models.FileField(verbose_name="오디오 파일명", null=True)
     speed = models.FloatField(max_length=10)
     update_time = models.DateTimeField(auto_now=True)
-    text = models.TextField()
     speed = models.IntegerField(default=0)
     project_id = models.ForeignKey(Project, on_delete=models.CASCADE)
 
