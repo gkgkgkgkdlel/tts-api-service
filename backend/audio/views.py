@@ -9,11 +9,6 @@ from .models import Audio, Project, Text, TextList
 # Create your views here.
 
 
-class TextView(APIView):
-    def get(self, request):
-        return Response({"테스트 중입니다"})
-
-
 class CreateAudioView(APIView):
     def post(self, request):
 
@@ -35,7 +30,7 @@ class CreateAudioView(APIView):
 
             pattern = "[\w\sㄱ-ㅎ가-힣]+[.!?]"
 
-            result = re.findall(pattern, text)
+            result = re.findall(pattern, text)  # .!? 기준으로 문장 나누기
             result = list(map(lambda x: x.strip(), result))  # 문장 앞뒤 공백 제거
 
             preprocessed_text_list.append(result)
@@ -124,3 +119,66 @@ class UpdateTextView(APIView):
         textlist_obj.save()
 
         return Response(status=status.HTTP_201_CREATED)
+
+
+class GetAudioFileView(APIView):
+    def get(self, request):
+        project_id = request.GET.get("project_id", None)
+        audio_obj = Audio.objects.get(project_id=project_id)
+        audio_file = audio_obj.audio_file
+
+        return Response({"audio_file": str(audio_file)})
+
+
+class InsertTextView(APIView):
+    def post(self, request):
+        data = json.loads(request.body)
+        project_id = data["project_id"]
+        text = data["text"]
+        text_idx = data["text_idx"]
+
+        audio_obj = Audio.objects.get(project_id=project_id)
+        text_objs = Text.objects.filter(
+            audio_id=audio_obj.id, idx__gt=text_idx
+        )
+
+        for text_obj in text_objs:
+            text_obj.idx = text_obj.idx + 1
+            text_obj.save()
+
+        preprocessed_text_list = []
+
+        pattern = "[^\w\s?.!ㄱ-ㅎ가-힣]"
+
+        if re.search(pattern, text):
+            text = re.sub(pattern, "", text)
+
+        pattern = "[\w\sㄱ-ㅎ가-힣]+[.!?]"
+
+        result = re.findall(pattern, text)  # .!? 기준으로 문장 나누기
+        result = list(map(lambda x: x.strip(), result))  # 문장 앞뒤 공백 제거
+
+        preprocessed_text_list.append(result)
+
+        Text.objects.create(
+            idx=text_idx, text=preprocessed_text_list, audio_id=audio_obj
+        )
+
+        """
+        Text 정보들로 새로운 오디오 파일을 생성했다고 가정.
+        """
+        new_audio_file = "static/audio/updated_" + str(project_id) + ".mp3"
+        audio_obj.audio_file = new_audio_file
+
+        audio_obj.save()
+
+        return Response(status=status.HTTP_201_CREATED)
+
+
+class DeleteProjectView(APIView):
+    def get(self, request, project_id):
+        print("project_id는 ", project_id)
+        project_obj = Project.objects.get(id=project_id)
+        project_obj.delete()
+
+        return Response(status=status.HTTP_200_OK)
