@@ -1,5 +1,6 @@
 from rest_framework.views import APIView
 from rest_framework.response import Response
+from rest_framework import status
 import json
 import re
 from .models import Audio, Project, Text, TextList
@@ -33,12 +34,9 @@ class CreateAudioView(APIView):
                 text = re.sub(pattern, "", text)
 
             pattern = "[\w\sㄱ-ㅎ가-힣]+[.!?]"
-            # result = re.search(pattern, text)
+
             result = re.findall(pattern, text)
             result = list(map(lambda x: x.strip(), result))  # 문장 앞뒤 공백 제거
-
-            # texts_dict = {(i + 1): result[i] for i in range(0, len(result))}    # 하나의 텍스트를 여러 개의 문장으로 idx값 붙여줌.
-            # texts_dict[id] = result
 
             preprocessed_text_list.append(result)
 
@@ -103,3 +101,26 @@ def tts(project_id, text_list, path):
             idx = idx + 1
 
     return texts_dict
+
+
+class UpdateTextView(APIView):
+    def put(self, request):
+        data = json.loads(request.body)
+        project_id = data["project_id"]
+        sentence_idx = data["sentence_idx"]
+        sentence = data["sentence"]
+        speed = data["speed"]
+
+        audio_obj = Audio.objects.get(project_id=project_id)
+        audio_obj.speed = speed
+        audio_obj.save()
+
+        audio_id = audio_obj.id
+        text_id = Text.objects.filter(audio_id=audio_id).latest("id").id
+        textlist_obj = TextList.objects.get(
+            text_id=text_id, sentence_idx=sentence_idx
+        )
+        textlist_obj.sentence = sentence
+        textlist_obj.save()
+
+        return Response(status=status.HTTP_201_CREATED)
