@@ -21,7 +21,6 @@ class CreateAudioView(APIView):
 
         Project.objects.create(project_title=project_title)
         project_id = Project.objects.latest("id").id
-        print("project_id는 ", project_id)
 
         text_list = datas["text"]
         id = 1
@@ -29,7 +28,7 @@ class CreateAudioView(APIView):
 
         for text in text_list:
             pattern = "[^\w\s?.!ㄱ-ㅎ가-힣]"
-            print(re.search(pattern, text))
+
             if re.search(pattern, text):
                 text = re.sub(pattern, "", text)
 
@@ -51,6 +50,31 @@ class CreateAudioView(APIView):
         return Response({"texts_dict": texts_dict})
 
 
+class ReadTextView(APIView):
+    def get(self, request):
+
+        project_id = request.GET.get("project_id", None)
+        page = request.GET.get("page", None)
+
+        audio_id = Audio.objects.get(project_id=project_id).id
+
+        text_id = Text.objects.filter(audio_id=audio_id).latest("id").id
+
+        start_index = (int(page) - 1) * 10
+        end_index = start_index + 9
+        sentences_set = TextList.objects.filter(
+            sentence_idx__gte=start_index,
+            sentence_idx__lte=end_index,
+            text_id=text_id,
+        ).order_by("sentence_idx")
+        i = 1
+        sentence_result = {
+            i: sentences_set[i].sentence for i in range(0, len(sentences_set))
+        }
+
+        return Response(sentence_result)
+
+
 def tts(project_id, text_list, path):
 
     project_obj = Project.objects.get(id=project_id)
@@ -70,11 +94,9 @@ def tts(project_id, text_list, path):
         text_sentences = text_sentences[1 : len(text_sentences) - 1]
         text_sentences = text_sentences.split(",")
 
-        print("@@text_sentence는 ", text_sentences)
         idx = 0
-        print("text는 ", text)
+
         for text_sentence in text_sentences:
-            print("text_sentence는 ", text_sentence)
             TextList.objects.create(
                 sentence_idx=idx, text_id=text_obj, sentence=text_sentence
             )
